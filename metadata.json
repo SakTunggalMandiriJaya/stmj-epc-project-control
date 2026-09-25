@@ -1,0 +1,6 @@
+{
+  "name": "ProcureSaaS — Enterprise SaaS RFQ & Quotation Benchmark Engine",
+  "description": "Enterprise SaaS Request for Quotation (RFQ) management platform to structure requirements, solicit and evaluate vendor software bids, calculate 3-year TCO, benchmark SLA terms, and negotiate enterprise SaaS contracts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
