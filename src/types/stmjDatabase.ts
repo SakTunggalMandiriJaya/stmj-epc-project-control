@@ -82,6 +82,24 @@ export type LineItemCategory =
   | 'Installation, Commissioning & Testing'
   | 'Consumables & Logistics';
 
+export type VendorPoStatus = 
+  | 'Pending RFQ' 
+  | 'PO Issued' 
+  | 'Vendor In Production' 
+  | 'Shipped by Vendor' 
+  | 'Delivered to STMJ Office' 
+  | 'Sent to Client Site' 
+  | 'Arrived at Site & Inspected' 
+  | 'Ready for Installation' 
+  | 'Installed & Connected';
+
+export type LogisticsDeliveryStage = 
+  | 'Stage 1: PO Issued & Paid'
+  | 'Stage 2: Delivered to STMJ Office'
+  | 'Stage 3: Dispatched to Client Site'
+  | 'Stage 4: Arrived at Site'
+  | 'Stage 5: Ready for Installation';
+
 export interface QuotationLineItem {
   item_id: string; // PK, e.g. "QLI-101"
   quotation_id: string; // FK -> Quotation.quotation_id
@@ -98,6 +116,124 @@ export interface QuotationLineItem {
   total_price_idr: number; // quantity * unit_price_idr
   gross_profit_idr: number; // total_price_idr - total_hpp_idr
   margin_pct: number; // (gross_profit / total_price) * 100
+
+  // Vendor Procurement, Lead Time & Logistics Flow (User requested)
+  vendor_id?: string; // FK -> Vendor.vendor_id
+  vendor_name?: string; // e.g. "PT Hygood Fire Protection Indonesia"
+  vendor_po_number?: string; // e.g. "PO/STMJ/VND/2026/09/032"
+  po_issued_date?: string; // YYYY-MM-DD
+  po_status?: VendorPoStatus;
+  vendor_payment_status?: 'Unpaid' | 'DP Paid (50%)' | 'Fully Paid (100%)';
+  lead_time_desc?: string; // e.g. "4-6 Weeks ex-factory"
+  expected_arrival_date?: string; // YYYY-MM-DD
+  actual_arrival_date?: string;
+  logistics_stage?: LogisticsDeliveryStage;
+  delivered_to_stmj_office?: boolean;
+  delivered_to_stmj_date?: string;
+  sent_to_client_site?: boolean;
+  sent_to_site_date?: string;
+  arrived_at_site?: boolean;
+  arrived_at_site_date?: string;
+  ready_for_installation?: boolean;
+  installation_status?: 'Pending' | 'In Progress' | 'Installed';
+}
+
+// -------------------------------------------------------------
+// Entity 13: Technical Team Deployment & Commissioning
+// -------------------------------------------------------------
+export type TechnicalDeploymentStatus = 
+  | 'Not Mobilized'
+  | 'Deployment Scheduled'
+  | 'Mobilized to Site'
+  | 'On-Site Active'
+  | 'Demobilized';
+
+export interface TechnicalDeploymentMember {
+  member_id: string;
+  name: string;
+  role: 'Lead Project Engineer' | 'Lead Welder 6G (Certified)' | 'E&I Commissioning Engineer' | 'HSE Safety Officer' | 'Piping Fitter';
+  certification: string; // e.g. "MIG/TIG 6G ASME Sec IX, Disnaker K3"
+  contact_phone: string;
+  badge_cleared: boolean; // Site safety induction pass
+}
+
+export interface TechnicalTeamDeployment {
+  deployment_id: string; // PK e.g. "DEP-2026-001"
+  quotation_id: string; // FK -> Quotation
+  project_id?: string; // FK -> Project
+  team_lead: string;
+  status: TechnicalDeploymentStatus;
+  mobilization_date: string; // YYYY-MM-DD
+  demobilization_target_date: string; // YYYY-MM-DD
+  site_location: string;
+  manpower_count: number;
+  members: TechnicalDeploymentMember[];
+  daily_activity_summary?: string;
+}
+
+// -------------------------------------------------------------
+// Entity 14: FAT (Factory Acceptance Test) & SAT Schedule
+// -------------------------------------------------------------
+export type FatStatus = 'Pending Protocol' | 'FAT Scheduled' | 'FAT Witnessed & Passed' | 'Punchlist Pending' | 'FAT Waived';
+
+export interface FatSatSchedule {
+  fat_id: string; // PK e.g. "FAT-2026-001"
+  quotation_id: string; // FK -> Quotation
+  project_id?: string;
+  fat_date: string; // YYYY-MM-DD
+  fat_venue: string; // e.g. "STMJ Workshop Cikarang & Tyco Lab"
+  fat_witness_client: string; // e.g. "Bpk. Bambang (PT Samator Gas Engineer)"
+  fat_status: FatStatus;
+  fat_protocol_name: string; // e.g. "Clean Agent Hydro-pneumatic & Solenoid Release Test Protocol Rev. 1"
+  fat_passed_date?: string;
+  fat_certificate_no?: string; // e.g. "FAT-STMJ-2026-088"
+  sat_date?: string; // Site Acceptance Test
+  hydrotest_date?: string; // Piping hydrotest (1.5x design pressure)
+  fan_retention_test_date?: string; // Room integrity fan test (> 10 min retention)
+  disnaker_inspection_date?: string; // Statutory certification
+  bast_target_date: string; // Final handover
+}
+
+// -------------------------------------------------------------
+// Entity 15: Physical / Engineering Progress Measurement (WBS Level 1, Level 2, Level 3)
+// -------------------------------------------------------------
+export interface WbsLevel3Task {
+  task_id: string; // e.g. "WBS-1.1.1"
+  level2_code: 'ENG' | 'PROC' | 'INST' | 'COMM';
+  task_name: string;
+  discipline: string;
+  weight_in_wp_pct: number; // Weight within this Level 2 package (sum = 100%)
+  planned_progress_pct: number; // 0-100%
+  actual_progress_pct: number; // 0-100%
+  status: 'Not Started' | 'In Progress' | 'Under Inspection' | 'Completed';
+  start_date: string;
+  target_finish_date: string;
+  assigned_engineer: string;
+  deliverable_document?: string;
+}
+
+export interface WbsLevel2WorkPackage {
+  wp_code: 'ENG' | 'PROC' | 'INST' | 'COMM';
+  wp_name: string; // e.g. "WP-1: Engineering, Drawings & Hydraulic Calculations"
+  weight_overall_pct: number; // e.g. 15% (sum of all 4 = 100%)
+  planned_progress_pct: number; // weighted sum of level 3 tasks
+  actual_progress_pct: number; // weighted sum of level 3 tasks
+  lead_engineer: string;
+  tasks: WbsLevel3Task[];
+}
+
+export interface WbsLevel1Progress {
+  progress_id: string; // PK
+  quotation_id: string;
+  project_id?: string;
+  project_name: string;
+  client_name: string;
+  as_of_date: string;
+  overall_planned_progress_pct: number; // Level 1 overall weighted planned %
+  overall_actual_progress_pct: number; // Level 1 overall weighted actual %
+  variance_pct: number; // actual - planned (+ ahead, - delay)
+  schedule_status: 'On Schedule' | 'Ahead of Schedule' | 'Critical Delay' | 'Minor Delay';
+  work_packages: WbsLevel2WorkPackage[];
 }
 
 // -------------------------------------------------------------
@@ -248,9 +384,14 @@ export interface PurchaseOrder {
   po_number: string; // e.g. "PO/STMJ/VND/2026/09/032"
   issue_date: string;
   delivery_due_date: string;
+  actual_delivery_date?: string;
   total_amount_idr: number;
   payment_status: 'Pending' | 'DP Paid' | 'Fully Paid';
   delivery_status: 'Issued' | 'In Production' | 'In Transit' | 'Received at Site';
+  satisfaction_score?: number; // 1.0 - 5.0 project satisfaction rating
+  quality_score_pct?: number; // 0 - 100% defect-free / compliance rate
+  on_time_status?: 'Early' | 'On-Time' | 'Minor Delay' | 'Critical Delay';
+  evaluation_notes?: string;
 }
 
 // -------------------------------------------------------------

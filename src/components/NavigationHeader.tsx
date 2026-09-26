@@ -10,7 +10,11 @@ import {
   ShieldCheck,
   Flame,
   Layers,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  HardHat,
+  Truck,
+  Award
 } from 'lucide-react';
 import { formatIDR } from '../utils/stmjFormatters';
 
@@ -18,6 +22,9 @@ export type ActiveNavTab =
   | 'quotations' 
   | 'costing' 
   | 'milestones' 
+  | 'procurement'
+  | 'vendor_performance'
+  | 'execution'
   | 'libraries' 
   | 'sales' 
   | 'schema' 
@@ -28,6 +35,7 @@ interface NavigationHeaderProps {
   onSelectTab: (tab: ActiveNavTab) => void;
   quotationCount: number;
   totalPipelineIdr: number;
+  boqCount?: number;
   onResetSeed?: () => void;
 }
 
@@ -36,12 +44,16 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onSelectTab,
   quotationCount,
   totalPipelineIdr,
+  boqCount,
   onResetSeed,
 }) => {
   const navItems: { id: ActiveNavTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'quotations', label: 'Quotations & BOQ', icon: <FileText className="w-4 h-4" />, badge: String(quotationCount) },
     { id: 'costing', label: 'Project Costing (HPP)', icon: <Calculator className="w-4 h-4" /> },
     { id: 'milestones', label: 'Milestones & Termin', icon: <Clock className="w-4 h-4" /> },
+    { id: 'procurement', label: 'Procurement Tracker', icon: <Truck className="w-4 h-4" />, badge: boqCount !== undefined ? String(boqCount) : undefined },
+    { id: 'vendor_performance', label: 'Vendor Performance', icon: <Award className="w-4 h-4" /> },
+    { id: 'execution', label: 'Site Execution & WBS (L1-3)', icon: <Activity className="w-4 h-4" /> },
     { id: 'libraries', label: 'Engineering Libraries', icon: <Package className="w-4 h-4" /> },
     { id: 'sales', label: 'Sales & Realized Margins', icon: <TrendingUp className="w-4 h-4" /> },
     { id: 'schema', label: 'Relational Schema (ERD)', icon: <Database className="w-4 h-4" /> },
