@@ -36,72 +36,132 @@ import { SalesReportAnalytics } from './components/SalesReportAnalytics';
 import { RelationalSchemaViewer } from './components/RelationalSchemaViewer';
 import { RelationalDataExplorer } from './components/RelationalDataExplorer';
 
+const DB_SEED_VERSION = 'stmj_seed_v2_2_won_boq';
+
+function loadOrMergeSeed<T>(
+  key: string,
+  initialData: T[],
+  idField: keyof T
+): T[] {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return initialData;
+    const parsed: T[] = JSON.parse(saved);
+    if (!Array.isArray(parsed) || parsed.length === 0) return initialData;
+
+    // Check if any initial seed items are missing in local storage
+    const existingIds = new Set(parsed.map(item => item[idField]));
+    const missingItems = initialData.filter(item => !existingIds.has(item[idField]));
+
+    if (missingItems.length > 0) {
+      const merged = [...parsed, ...missingItems];
+      return merged;
+    }
+    return parsed;
+  } catch (e) {
+    console.error(`Failed to load ${key} from localStorage, using initial seed:`, e);
+    return initialData;
+  }
+}
+
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<ActiveNavTab>('quotations');
   const [targetQuotationId, setTargetQuotationId] = useState<string>('Q-2026-001');
   const [targetTableName, setTargetTableName] = useState<string>('quotation');
 
-  // 12 Relational Tables State (with LocalStorage persistence)
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('stmj_customers');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOMERS;
-  });
+  // 12 Relational Tables State (with LocalStorage persistence & auto-merging of seed records)
+  const [customers, setCustomers] = useState<Customer[]>(() => 
+    loadOrMergeSeed('stmj_customers', INITIAL_CUSTOMERS, 'customer_id')
+  );
 
-  const [vendors, setVendors] = useState<Vendor[]>(() => {
-    const saved = localStorage.getItem('stmj_vendors');
-    return saved ? JSON.parse(saved) : INITIAL_VENDORS;
-  });
+  const [vendors, setVendors] = useState<Vendor[]>(() => 
+    loadOrMergeSeed('stmj_vendors', INITIAL_VENDORS, 'vendor_id')
+  );
 
-  const [quotations, setQuotations] = useState<Quotation[]>(() => {
-    const saved = localStorage.getItem('stmj_quotations');
-    return saved ? JSON.parse(saved) : INITIAL_QUOTATIONS;
-  });
+  const [quotations, setQuotations] = useState<Quotation[]>(() => 
+    loadOrMergeSeed('stmj_quotations', INITIAL_QUOTATIONS, 'quotation_id')
+  );
 
-  const [lineItems, setLineItems] = useState<QuotationLineItem[]>(() => {
-    const saved = localStorage.getItem('stmj_line_items');
-    return saved ? JSON.parse(saved) : INITIAL_QUOTATION_LINE_ITEMS;
-  });
+  const [lineItems, setLineItems] = useState<QuotationLineItem[]>(() => 
+    loadOrMergeSeed('stmj_line_items', INITIAL_QUOTATION_LINE_ITEMS, 'item_id')
+  );
 
-  const [costCalculations, setCostCalculations] = useState<ProjectCostCalculation[]>(() => {
-    const saved = localStorage.getItem('stmj_cost_calculations');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECT_COST_CALCULATIONS;
-  });
+  const [costCalculations, setCostCalculations] = useState<ProjectCostCalculation[]>(() => 
+    loadOrMergeSeed('stmj_cost_calculations', INITIAL_PROJECT_COST_CALCULATIONS, 'cost_calc_id')
+  );
 
-  const [milestones, setMilestones] = useState<ProjectMilestone[]>(() => {
-    const saved = localStorage.getItem('stmj_milestones');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECT_MILESTONES;
-  });
+  const [milestones, setMilestones] = useState<ProjectMilestone[]>(() => 
+    loadOrMergeSeed('stmj_milestones', INITIAL_PROJECT_MILESTONES, 'milestone_id')
+  );
 
-  const [vendorMaterials, setVendorMaterials] = useState<VendorMaterialItem[]>(() => {
-    const saved = localStorage.getItem('stmj_vendor_materials');
-    return saved ? JSON.parse(saved) : INITIAL_VENDOR_MATERIALS;
-  });
+  const [vendorMaterials, setVendorMaterials] = useState<VendorMaterialItem[]>(() => 
+    loadOrMergeSeed('stmj_vendor_materials', INITIAL_VENDOR_MATERIALS, 'material_id')
+  );
 
-  const [fireSuppressionLibrary, setFireSuppressionLibrary] = useState<FireSuppressionComponent[]>(() => {
-    const saved = localStorage.getItem('stmj_fire_suppression');
-    return saved ? JSON.parse(saved) : INITIAL_FIRE_SUPPRESSION_LIBRARY;
-  });
+  const [fireSuppressionLibrary, setFireSuppressionLibrary] = useState<FireSuppressionComponent[]>(() => 
+    loadOrMergeSeed('stmj_fire_suppression', INITIAL_FIRE_SUPPRESSION_LIBRARY, 'system_component_id')
+  );
 
-  const [projects, setProjects] = useState<ProjectMaster[]>(() => {
-    const saved = localStorage.getItem('stmj_projects');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
-  });
+  const [projects, setProjects] = useState<ProjectMaster[]>(() => 
+    loadOrMergeSeed('stmj_projects', INITIAL_PROJECTS, 'project_id')
+  );
 
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
-    const saved = localStorage.getItem('stmj_purchase_orders');
-    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_ORDERS;
-  });
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => 
+    loadOrMergeSeed('stmj_purchase_orders', INITIAL_PURCHASE_ORDERS, 'po_id')
+  );
 
-  const [salesReports, setSalesReports] = useState<SalesReport[]>(() => {
-    const saved = localStorage.getItem('stmj_sales_reports');
-    return saved ? JSON.parse(saved) : INITIAL_SALES_REPORTS;
-  });
+  const [salesReports, setSalesReports] = useState<SalesReport[]>(() => 
+    loadOrMergeSeed('stmj_sales_reports', INITIAL_SALES_REPORTS, 'sales_id')
+  );
 
-  const [auditLogs, setAuditLogs] = useState<DatabaseAuditLog[]>(() => {
-    const saved = localStorage.getItem('stmj_audit_logs');
-    return saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
-  });
+  const [auditLogs, setAuditLogs] = useState<DatabaseAuditLog[]>(() => 
+    loadOrMergeSeed('stmj_audit_logs', INITIAL_AUDIT_LOGS, 'log_id')
+  );
+
+  // Auto-migration & seed verification on mount
+  useEffect(() => {
+    const currentVersion = localStorage.getItem('stmj_db_version');
+    if (currentVersion !== DB_SEED_VERSION) {
+      // Force sync missing won quotations, line items, and related records
+      setQuotations(prev => {
+        const existingIds = new Set(prev.map(q => q.quotation_id));
+        const missing = INITIAL_QUOTATIONS.filter(q => !existingIds.has(q.quotation_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      setLineItems(prev => {
+        const existingIds = new Set(prev.map(li => li.item_id));
+        const missing = INITIAL_QUOTATION_LINE_ITEMS.filter(li => !existingIds.has(li.item_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      setCostCalculations(prev => {
+        const existingIds = new Set(prev.map(c => c.cost_calc_id));
+        const missing = INITIAL_PROJECT_COST_CALCULATIONS.filter(c => !existingIds.has(c.cost_calc_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      setMilestones(prev => {
+        const existingIds = new Set(prev.map(m => m.milestone_id));
+        const missing = INITIAL_PROJECT_MILESTONES.filter(m => !existingIds.has(m.milestone_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      setProjects(prev => {
+        const existingIds = new Set(prev.map(p => p.project_id));
+        const missing = INITIAL_PROJECTS.filter(p => !existingIds.has(p.project_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      setPurchaseOrders(prev => {
+        const existingIds = new Set(prev.map(p => p.po_id));
+        const missing = INITIAL_PURCHASE_ORDERS.filter(p => !existingIds.has(p.po_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      setSalesReports(prev => {
+        const existingIds = new Set(prev.map(s => s.sales_id));
+        const missing = INITIAL_SALES_REPORTS.filter(s => !existingIds.has(s.sales_id));
+        return missing.length > 0 ? [...prev, ...missing] : prev;
+      });
+      localStorage.setItem('stmj_db_version', DB_SEED_VERSION);
+    }
+  }, []);
 
   // Save to LocalStorage
   useEffect(() => {
@@ -139,6 +199,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('stmj_projects', JSON.stringify(projects));
   }, [projects]);
+
+  useEffect(() => {
+    localStorage.setItem('stmj_purchase_orders', JSON.stringify(purchaseOrders));
+  }, [purchaseOrders]);
+
+  useEffect(() => {
+    localStorage.setItem('stmj_sales_reports', JSON.stringify(salesReports));
+  }, [salesReports]);
+
+  useEffect(() => {
+    localStorage.setItem('stmj_audit_logs', JSON.stringify(auditLogs));
+  }, [auditLogs]);
 
   useEffect(() => {
     localStorage.setItem('stmj_purchase_orders', JSON.stringify(purchaseOrders));
@@ -298,6 +370,69 @@ export default function App() {
     setFireSuppressionLibrary(prev => [...prev, newComp]);
   };
 
+  const handleBatchAddLineItems = (newItems: QuotationLineItem[]) => {
+    if (newItems.length === 0) return;
+    setLineItems(prev => {
+      const existingIds = new Set(prev.map(li => li.item_id));
+      const filtered = newItems.filter(item => !existingIds.has(item.item_id));
+      return [...prev, ...filtered];
+    });
+
+    // Recalculate quotation
+    const quotationId = newItems[0].quotation_id;
+    setQuotations(prev => prev.map(q => {
+      if (q.quotation_id === quotationId) {
+        const existingForQuo = lineItems.filter(li => li.quotation_id === quotationId);
+        const allLines = [...existingForQuo, ...newItems];
+        const subtotalHpp = allLines.reduce((acc, li) => acc + li.total_hpp_idr, 0);
+        const subtotalSell = allLines.reduce((acc, li) => acc + li.total_price_idr, 0);
+        const ppn = subtotalSell * (q.ppn_pct / 100);
+        const total = subtotalSell + ppn;
+        const grossProfit = subtotalSell - subtotalHpp;
+        const marginPct = subtotalSell > 0 ? (grossProfit / subtotalSell) * 100 : q.target_margin_pct;
+
+        return {
+          ...q,
+          subtotal_hpp_idr: subtotalHpp,
+          subtotal_sell_idr: subtotalSell,
+          ppn_amount_idr: ppn,
+          total_amount_idr: total,
+          target_margin_pct: marginPct,
+        };
+      }
+      return q;
+    }));
+  };
+
+  const handleResetToSeed = () => {
+    localStorage.setItem('stmj_customers', JSON.stringify(INITIAL_CUSTOMERS));
+    localStorage.setItem('stmj_vendors', JSON.stringify(INITIAL_VENDORS));
+    localStorage.setItem('stmj_quotations', JSON.stringify(INITIAL_QUOTATIONS));
+    localStorage.setItem('stmj_line_items', JSON.stringify(INITIAL_QUOTATION_LINE_ITEMS));
+    localStorage.setItem('stmj_cost_calculations', JSON.stringify(INITIAL_PROJECT_COST_CALCULATIONS));
+    localStorage.setItem('stmj_milestones', JSON.stringify(INITIAL_PROJECT_MILESTONES));
+    localStorage.setItem('stmj_vendor_materials', JSON.stringify(INITIAL_VENDOR_MATERIALS));
+    localStorage.setItem('stmj_fire_suppression', JSON.stringify(INITIAL_FIRE_SUPPRESSION_LIBRARY));
+    localStorage.setItem('stmj_projects', JSON.stringify(INITIAL_PROJECTS));
+    localStorage.setItem('stmj_purchase_orders', JSON.stringify(INITIAL_PURCHASE_ORDERS));
+    localStorage.setItem('stmj_sales_reports', JSON.stringify(INITIAL_SALES_REPORTS));
+    localStorage.setItem('stmj_audit_logs', JSON.stringify(INITIAL_AUDIT_LOGS));
+    localStorage.setItem('stmj_db_version', DB_SEED_VERSION);
+
+    setCustomers(INITIAL_CUSTOMERS);
+    setVendors(INITIAL_VENDORS);
+    setQuotations(INITIAL_QUOTATIONS);
+    setLineItems(INITIAL_QUOTATION_LINE_ITEMS);
+    setCostCalculations(INITIAL_PROJECT_COST_CALCULATIONS);
+    setMilestones(INITIAL_PROJECT_MILESTONES);
+    setVendorMaterials(INITIAL_VENDOR_MATERIALS);
+    setFireSuppressionLibrary(INITIAL_FIRE_SUPPRESSION_LIBRARY);
+    setProjects(INITIAL_PROJECTS);
+    setPurchaseOrders(INITIAL_PURCHASE_ORDERS);
+    setSalesReports(INITIAL_SALES_REPORTS);
+    setAuditLogs(INITIAL_AUDIT_LOGS);
+  };
+
   // Cross-Navigation Shortcuts
   const navigateToQuotation = (quotationId: string) => {
     setTargetQuotationId(quotationId);
@@ -327,6 +462,7 @@ export default function App() {
         onSelectTab={setActiveTab}
         quotationCount={quotations.length}
         totalPipelineIdr={totalPipelineIdr}
+        onResetSeed={handleResetToSeed}
       />
 
       {/* Main Dynamic View Content */}
@@ -338,12 +474,16 @@ export default function App() {
             lineItems={lineItems}
             vendorMaterials={vendorMaterials}
             fireSuppressionLibrary={fireSuppressionLibrary}
+            selectedQuotationId={targetQuotationId}
+            onSelectQuotation={(id) => setTargetQuotationId(id)}
             onUpdateQuotation={handleUpdateQuotation}
             onAddQuotation={handleAddQuotation}
             onAddLineItem={handleAddLineItem}
+            onBatchAddLineItems={handleBatchAddLineItems}
             onDeleteLineItem={handleDeleteLineItem}
             onOpenCostCalculator={openCostCalculator}
             onOpenMilestones={openMilestones}
+            onResetDatabase={handleResetToSeed}
           />
         )}
 

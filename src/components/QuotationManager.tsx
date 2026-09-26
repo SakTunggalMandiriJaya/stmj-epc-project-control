@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileText, 
   Plus, 
@@ -20,7 +20,9 @@ import {
   X,
   FileCheck2,
   TrendingUp,
-  Sliders
+  Sliders,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { 
   Quotation, 
@@ -31,6 +33,7 @@ import {
   LineItemCategory,
   QuotationStatus
 } from '../types/stmjDatabase';
+import { INITIAL_QUOTATION_LINE_ITEMS, INITIAL_QUOTATIONS } from '../data/stmjDatabaseSeed';
 import { formatIDR, formatPercent, formatDate, getStatusBadgeClass } from '../utils/stmjFormatters';
 
 interface QuotationManagerProps {
@@ -39,12 +42,16 @@ interface QuotationManagerProps {
   lineItems: QuotationLineItem[];
   vendorMaterials: VendorMaterialItem[];
   fireSuppressionLibrary: FireSuppressionComponent[];
+  selectedQuotationId?: string;
+  onSelectQuotation?: (id: string) => void;
   onUpdateQuotation: (updated: Quotation) => void;
   onAddQuotation: (newQuo: Quotation, initialLines: QuotationLineItem[]) => void;
   onAddLineItem: (item: QuotationLineItem) => void;
+  onBatchAddLineItems?: (items: QuotationLineItem[]) => void;
   onDeleteLineItem: (itemId: string) => void;
   onOpenCostCalculator: (quotationId: string) => void;
   onOpenMilestones: (quotationId: string) => void;
+  onResetDatabase?: () => void;
 }
 
 export const QuotationManager: React.FC<QuotationManagerProps> = ({
@@ -53,19 +60,37 @@ export const QuotationManager: React.FC<QuotationManagerProps> = ({
   lineItems,
   vendorMaterials,
   fireSuppressionLibrary,
+  selectedQuotationId: propSelectedQuotationId,
+  onSelectQuotation,
   onUpdateQuotation,
   onAddQuotation,
   onAddLineItem,
+  onBatchAddLineItems,
   onDeleteLineItem,
   onOpenCostCalculator,
   onOpenMilestones,
+  onResetDatabase,
 }) => {
-  const [selectedQuotationId, setSelectedQuotationId] = useState<string>(quotations[0]?.quotation_id || '');
+  const [selectedQuotationId, setSelectedQuotationId] = useState<string>(
+    propSelectedQuotationId || quotations[0]?.quotation_id || ''
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showNewQuoModal, setShowNewQuoModal] = useState(false);
+
+  // Sync incoming propSelectedQuotationId
+  useEffect(() => {
+    if (propSelectedQuotationId && propSelectedQuotationId !== selectedQuotationId) {
+      setSelectedQuotationId(propSelectedQuotationId);
+      // If the targeted quotation has a specific status and it's currently hidden by statusFilter, reset filter to All
+      const target = quotations.find(q => q.quotation_id === propSelectedQuotationId);
+      if (target && statusFilter !== 'All' && target.status !== statusFilter) {
+        setStatusFilter('All');
+      }
+    }
+  }, [propSelectedQuotationId, quotations]);
 
   // New Line Item State
   const [selectedCatalogMatId, setSelectedCatalogMatId] = useState<string>('');
@@ -89,9 +114,26 @@ export const QuotationManager: React.FC<QuotationManagerProps> = ({
     });
   }, [quotations, customers, searchTerm, statusFilter]);
 
+  // When filteredQuotations change, ensure selectedQuotationId is in the list
+  useEffect(() => {
+    if (filteredQuotations.length > 0) {
+      const isSelectedInList = filteredQuotations.some(q => q.quotation_id === selectedQuotationId);
+      if (!isSelectedInList) {
+        const nextId = filteredQuotations[0].quotation_id;
+        setSelectedQuotationId(nextId);
+        onSelectQuotation?.(nextId);
+      }
+    }
+  }, [filteredQuotations, selectedQuotationId, onSelectQuotation]);
+
   const activeQuotation = useMemo(() => {
+    if (filteredQuotations.length > 0) {
+      const matchInFiltered = filteredQuotations.find(q => q.quotation_id === selectedQuotationId);
+      if (matchInFiltered) return matchInFiltered;
+      return filteredQuotations[0];
+    }
     return quotations.find(q => q.quotation_id === selectedQuotationId) || quotations[0];
-  }, [quotations, selectedQuotationId]);
+  }, [filteredQuotations, quotations, selectedQuotationId]);
 
   const activeCustomer = useMemo(() => {
     if (!activeQuotation) return null;
@@ -102,6 +144,21 @@ export const QuotationManager: React.FC<QuotationManagerProps> = ({
     if (!activeQuotation) return [];
     return lineItems.filter(li => li.quotation_id === activeQuotation.quotation_id);
   }, [lineItems, activeQuotation]);
+
+  // Default seed items for the current active quotation if BoQ is empty
+  const defaultSeedLinesForActive = useMemo(() => {
+    if (!activeQuotation) return [];
+    return INITIAL_QUOTATION_LINE_ITEMS.filter(li => li.quotation_id === activeQuotation.quotation_id);
+  }, [activeQuotation]);
+
+  const handleRestoreDefaultSeedBoQ = () => {
+    if (!activeQuotation || defaultSeedLinesForActive.length === 0) return;
+    if (onBatchAddLineItems) {
+      onBatchAddLineItems(defaultSeedLinesForActive);
+    } else {
+      defaultSeedLinesForActive.forEach(item => onAddLineItem(item));
+    }
+  };
 
   // Aggregate Metrics for Active Quotation
   const calculatedTotals = useMemo(() => {
@@ -264,15 +321,28 @@ export const QuotationManager: React.FC<QuotationManagerProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                {['All', 'Won / PO Received', 'Submitted to Client', 'Internal Review', 'Draft'].map(st => (
+                {[
+                  { key: 'All', label: 'All', count: quotations.length },
+                  { key: 'Won / PO Received', label: 'Won & PO', count: quotations.filter(q => q.status === 'Won / PO Received').length },
+                  { key: 'Submitted to Client', label: 'Submitted', count: quotations.filter(q => q.status === 'Submitted to Client').length },
+                  { key: 'Internal Review', label: 'Review', count: quotations.filter(q => q.status === 'Internal Review').length },
+                  { key: 'Draft', label: 'Draft', count: quotations.filter(q => q.status === 'Draft').length },
+                ].map(st => (
                   <button
-                    key={st}
-                    onClick={() => setStatusFilter(st)}
-                    className={`px-2 py-0.5 whitespace-nowrap rounded text-[11px] font-medium transition-colors ${
-                      statusFilter === st ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    key={st.key}
+                    onClick={() => setStatusFilter(st.key)}
+                    className={`px-2 py-1 whitespace-nowrap rounded-md text-[11px] font-medium transition-all flex items-center gap-1.5 ${
+                      statusFilter === st.key 
+                        ? 'bg-indigo-600 text-white shadow-2xs font-semibold' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {st === 'Won / PO Received' ? 'Won' : st === 'Submitted to Client' ? 'Submitted' : st}
+                    <span>{st.label}</span>
+                    <span className={`px-1 py-0.2 rounded-full text-[10px] font-mono ${
+                      statusFilter === st.key ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {st.count}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -441,54 +511,77 @@ export const QuotationManager: React.FC<QuotationManagerProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {activeLineItems.map(item => (
-                        <tr key={item.item_id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-3 py-3">
-                            <div className="font-mono text-[11px] font-bold text-indigo-700">
-                              {item.item_code}
+                      {activeLineItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center bg-slate-50/50">
+                            <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                            <div className="font-semibold text-slate-800 text-xs">
+                              No BOQ line items registered for {activeQuotation.quotation_id}
                             </div>
-                            <div className="text-xs text-slate-800 font-medium mt-0.5 line-clamp-2">
-                              {item.description}
-                            </div>
-                            {item.material_id && (
-                              <span className="text-[10px] font-mono text-sky-600">
-                                ↳ Catalog: {item.material_id}
-                              </span>
+                            <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
+                              This quotation does not currently have bill of quantity lines in local storage.
+                            </p>
+                            {defaultSeedLinesForActive.length > 0 && (
+                              <button
+                                onClick={handleRestoreDefaultSeedBoQ}
+                                className="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs inline-flex items-center gap-1.5"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                Load Standard Engineering BOQ ({defaultSeedLinesForActive.length} items)
+                              </button>
                             )}
                           </td>
-                          <td className="px-3 py-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                              {item.category}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono">
-                            <span className="font-bold text-slate-900">{item.quantity}</span> {item.uom}
-                          </td>
-                          <td className="px-3 py-3 text-right font-mono text-slate-600">
-                            {formatIDR(item.unit_hpp_idr)}
-                          </td>
-                          <td className="px-3 py-3 text-center font-mono">
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                              +{item.markup_pct}%
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-right font-mono font-semibold text-slate-800">
-                            {formatIDR(item.unit_price_idr)}
-                          </td>
-                          <td className="px-3 py-3 text-right font-mono font-bold text-slate-900">
-                            {formatIDR(item.total_price_idr)}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <button
-                              onClick={() => onDeleteLineItem(item.item_id)}
-                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Delete Item"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        activeLineItems.map(item => (
+                          <tr key={item.item_id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-3 py-3">
+                              <div className="font-mono text-[11px] font-bold text-indigo-700">
+                                {item.item_code}
+                              </div>
+                              <div className="text-xs text-slate-800 font-medium mt-0.5 line-clamp-2">
+                                {item.description}
+                              </div>
+                              {item.material_id && (
+                                <span className="text-[10px] font-mono text-sky-600">
+                                  ↳ Catalog: {item.material_id}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                                {item.category}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-center font-mono">
+                              <span className="font-bold text-slate-900">{item.quantity}</span> {item.uom}
+                            </td>
+                            <td className="px-3 py-3 text-right font-mono text-slate-600">
+                              {formatIDR(item.unit_hpp_idr)}
+                            </td>
+                            <td className="px-3 py-3 text-center font-mono">
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                +{item.markup_pct}%
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-right font-mono font-semibold text-slate-800">
+                              {formatIDR(item.unit_price_idr)}
+                            </td>
+                            <td className="px-3 py-3 text-right font-mono font-bold text-slate-900">
+                              {formatIDR(item.total_price_idr)}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <button
+                                onClick={() => onDeleteLineItem(item.item_id)}
+                                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                title="Delete Item"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

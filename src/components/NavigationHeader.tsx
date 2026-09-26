@@ -9,7 +9,8 @@ import {
   Table as TableIcon,
   ShieldCheck,
   Flame,
-  Layers
+  Layers,
+  RefreshCw
 } from 'lucide-react';
 import { formatIDR } from '../utils/stmjFormatters';
 
@@ -27,6 +28,7 @@ interface NavigationHeaderProps {
   onSelectTab: (tab: ActiveNavTab) => void;
   quotationCount: number;
   totalPipelineIdr: number;
+  onResetSeed?: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -34,6 +36,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onSelectTab,
   quotationCount,
   totalPipelineIdr,
+  onResetSeed,
 }) => {
   const navItems: { id: ActiveNavTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'quotations', label: 'Quotations & BOQ', icon: <FileText className="w-4 h-4" />, badge: String(quotationCount) },
@@ -69,7 +72,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-3 text-xs">
           <div className="hidden sm:block text-right">
             <span className="text-slate-400 text-[10px] block">ACTIVE TENDER PIPELINE</span>
             <span className="font-mono font-bold text-amber-400 text-sm">
@@ -78,6 +81,17 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </div>
 
           <div className="h-8 w-px bg-slate-800 hidden sm:block" />
+
+          {onResetSeed && (
+            <button
+              onClick={onResetSeed}
+              title="Reset and synchronize relational seed data with all won quotations & BOQ lines"
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-700 transition-colors text-[11px] font-medium"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Sync Won Data</span>
+            </button>
+          )}
 
           <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
